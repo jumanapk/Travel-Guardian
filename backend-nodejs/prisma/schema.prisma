@@ -1,0 +1,205 @@
+// Travel Guard Prisma Relational Schema for PostgreSQL / Supabase
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  guide
+  tourist
+  admin
+}
+
+enum AccountStatus {
+  active
+  suspended
+  inactive
+}
+
+enum GroupStatus {
+  active
+  completed
+  paused
+}
+
+enum MembershipStatus {
+  with_group
+  separated
+  location_unavailable
+  offline
+}
+
+enum ReunionStatus {
+  pending
+  in_progress
+  reunited
+  not_applicable
+}
+
+enum AlertType {
+  sos_emergency
+  separated_tourist
+  location_unavailable
+  reunion_update
+  general_safety
+}
+
+enum AlertStatus {
+  active
+  investigating
+  resolved
+  closed
+}
+
+enum LocationSource {
+  demo
+  gps
+}
+
+model User {
+  id             String          @id @default(uuid()) @map("user_id")
+  name           String
+  email          String          @unique
+  passwordHash   String          @map("password_hash")
+  role           Role            @default(tourist)
+  phone          String?
+  accountStatus  AccountStatus   @default(active) @map("account_status")
+  createdAt      DateTime        @default(now()) @map("created_at")
+  updatedAt      DateTime        @updatedAt @map("updated_at")
+
+  guidedGroups   Group[]         @relation("GuideGroups")
+  memberships    GroupMember[]
+  locations      TouristLocation[]
+  createdAlerts  Alert[]         @relation("CreatedAlerts")
+  resolvedAlerts Alert[]         @relation("ResolvedAlerts")
+  reunionEvents  ReunionEvent[]  @relation("TouristReunions")
+  createdReunions ReunionEvent[] @relation("GuideCreatedReunions")
+  notifications  Notification[]
+  auditEvents    AuditEvent[]
+
+  @@map("users")
+}
+
+model Group {
+  id               String          @id @default(uuid()) @map("group_id")
+  groupName        String          @map("group_name")
+  guideId          String          @map("guide_id")
+  guide            User            @relation("GuideGroups", fields: [guideId], references: [id], onDelete: Restrict)
+  meetingPointName String          @default("Mattupetty Dam Pavilion") @map("meeting_point_name")
+  meetingPointLat  Float           @default(10.1082) @map("meeting_point_lat")
+  meetingPointLng  Float           @default(77.1245) @map("meeting_point_lng")
+  groupStatus      GroupStatus     @default(active) @map("group_status")
+  createdAt        DateTime        @default(now()) @map("created_at")
+  updatedAt        DateTime        @updatedAt @map("updated_at")
+
+  members          GroupMember[]
+  locations        TouristLocation[]
+  alerts           Alert[]
+  reunionEvents    ReunionEvent[]
+
+  @@map("groups")
+}
+
+model GroupMember {
+  id               String           @id @default(uuid()) @map("membership_id")
+  groupId          String           @map("group_id")
+  group            Group            @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  touristId        String           @map("tourist_id")
+  tourist          User             @relation(fields: [touristId], references: [id], onDelete: Restrict)
+  membershipStatus MembershipStatus @default(with_group) @map("membership_status")
+  reunionStatus    ReunionStatus    @default(not_applicable) @map("reunion_status")
+  joinedAt         DateTime         @default(now()) @map("joined_at")
+  updatedAt        DateTime         @updatedAt @map("updated_at")
+
+  @@unique([groupId, touristId])
+  @@map("group_members")
+}
+
+model TouristLocation {
+  id         String         @id @default(uuid()) @map("location_id")
+  touristId  String         @map("tourist_id")
+  tourist    User           @relation(fields: [touristId], references: [id], onDelete: Cascade)
+  groupId    String?        @map("group_id")
+  group      Group?         @relation(fields: [groupId], references: [id], onDelete: SetNull)
+  latitude   Float
+  longitude  Float
+  accuracy   Float?
+  batteryPct Int?           @map("battery_pct")
+  source     LocationSource @default(demo)
+  recordedAt DateTime       @default(now()) @map("recorded_at")
+
+  @@index([touristId, recordedAt(sort: Desc)])
+  @@map("tourist_locations")
+}
+
+model Alert {
+  id          String        @id @default(uuid()) @map("alert_id")
+  groupId     String        @map("group_id")
+  group       Group         @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  touristId   String?       @map("tourist_id")
+  tourist     User?         @relation(fields: [touristId], references: [id], onDelete: SetNull)
+  alertType   AlertType     @default(sos_emergency) @map("alert_type")
+  category    String        @default("Medical")
+  priority    String        @default("critical") // critical, high, medium, low
+  description String?
+  status      AlertStatus   @default(active)
+  createdBy   String        @map("created_by")
+  creator     User          @relation("CreatedAlerts", fields: [createdBy], references: [id])
+  resolvedBy  String?       @map("resolved_by")
+  resolver    User?         @relation("ResolvedAlerts", fields: [resolvedBy], references: [id])
+  createdAt   DateTime      @default(now()) @map("created_at")
+  updatedAt   DateTime      @updatedAt @map("updated_at")
+  resolvedAt  DateTime?     @map("resolved_at")
+
+  notifications Notification[]
+
+  @@index([groupId, status])
+  @@map("alerts")
+}
+
+model ReunionEvent {
+  id               String    @id @default(uuid()) @map("reunion_event_id")
+  groupId          String    @map("group_id")
+  group            Group     @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  touristId        String    @map("tourist_id")
+  tourist          User      @relation("TouristReunions", fields: [touristId], references: [id], onDelete: Cascade)
+  meetingPointName String    @map("meeting_point_name")
+  status           String    @default("in_progress") // in_progress, completed, cancelled
+  createdBy        String    @map("created_by")
+  creator          User      @relation("GuideCreatedReunions", fields: [createdBy], references: [id])
+  createdAt        DateTime  @default(now()) @map("created_at")
+  completedAt      DateTime? @map("completed_at")
+
+  @@map("reunion_events")
+}
+
+model Notification {
+  id              String   @id @default(uuid()) @map("notification_id")
+  recipientUserId String   @map("recipient_user_id")
+  recipient       User     @relation(fields: [recipientUserId], references: [id], onDelete: Cascade)
+  relatedAlertId  String?  @map("related_alert_id")
+  relatedAlert    Alert?   @relation(fields: [relatedAlertId], references: [id], onDelete: SetNull)
+  notificationType String  @map("notification_type")
+  message         String
+  readStatus      Int      @default(0) @map("read_status") // 0 or 1
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  @@index([recipientUserId, readStatus])
+  @@map("notifications")
+}
+
+model AuditEvent {
+  id        String   @id @default(uuid()) @map("audit_id")
+  userId    String   @map("user_id")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  action    String
+  details   String?  // JSON string
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([createdAt(sort: Desc)])
+  @@map("audit_events")
+}

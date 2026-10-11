@@ -1,0 +1,9 @@
+# Vercel Deployment Ignore
+.git
+.github
+.gemini
+scratch
+backend/database/travelguard.db
+*.pyc
+__pycache__
+*.log

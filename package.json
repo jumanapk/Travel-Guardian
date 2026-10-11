@@ -1,0 +1,14 @@
+{
+  "name": "travelguard-app",
+  "version": "1.0.0",
+  "description": "Travel Guard - Tourist Safety, Live SOS, and Emergency Assistance Platform",
+  "main": "api/index.js",
+  "scripts": {
+    "start": "node api/index.js",
+    "dev": "vercel dev"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.19.2"
+  }
+}
