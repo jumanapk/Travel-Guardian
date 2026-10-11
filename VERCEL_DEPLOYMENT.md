@@ -28,8 +28,8 @@ This guide explains how to deploy the entire **Travel Guard** full-stack applica
      * `POST /api/assistant/chat` (Munnar safety advisory assistant)
      * `GET /api/notifications`
 
-3. **[`package.json`](file:///c:/Users/déll/OneDrive/Desktop/web/package.json)**:
-   - Root project manifest declaring serverless dependencies.
+3. **Zero-Dependency Serverless Architecture**:
+   - `api/index.js` uses native Node.js HTTP handlers without extra package bloat, avoiding build-step framework detector conflicts with client-side `app.js`.
 
 4. **[`.vercelignore`](file:///c:/Users/déll/OneDrive/Desktop/web/.vercelignore)**:
    - Prevents unnecessary scratch files and local cache binaries from uploading.
