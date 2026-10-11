@@ -59,7 +59,10 @@ class TravelGuardHandler(http.server.BaseHTTPRequestHandler):
                 user = query_one("SELECT user_id, name, email, role, phone, account_status FROM users WHERE user_id = ?", (payload.get("user_id"),))
                 if user:
                     return user
-        # Default demo fallback to Tour Guide Jumana if unauthenticated
+        # Default demo fallback: query Tour Guide from database
+        guide = query_one("SELECT user_id, name, email, role, phone, account_status, created_at, updated_at FROM users WHERE role = 'guide' LIMIT 1")
+        if guide:
+            return guide
         return {
             "user_id": "usr-guide-01",
             "name": "Jumana",
@@ -81,8 +84,8 @@ class TravelGuardHandler(http.server.BaseHTTPRequestHandler):
         if path == "/api/health":
             return self.send_json(200, {"status": "ok", "timestamp": get_iso_now(), "service": "Travel Guard API"})
 
-        # Auth Me
-        if path == "/api/auth/me":
+        # Auth Me / Profile
+        if path in ["/api/auth/me", "/api/profile"]:
             user = self.get_auth_user()
             return self.send_json(200, {"user": user})
 
@@ -332,6 +335,33 @@ class TravelGuardHandler(http.server.BaseHTTPRequestHandler):
         parsed = urllib.parse.urlparse(self.path)
         path = parsed.path
         body = self.read_json_body() or {}
+
+        # Update Tour Guide Profile
+        if path == "/api/profile":
+            name = (body.get("name") or body.get("fullName") or "").strip()
+            if not name:
+                return self.send_json(400, {"error": "Tour guide name cannot be empty"})
+            phone = (body.get("phone") or "").strip()
+            now = get_iso_now()
+            auth_user = self.get_auth_user()
+            user_id = auth_user.get("user_id", "usr-guide-01")
+
+            execute_write("""
+                UPDATE users 
+                SET name = ?, phone = CASE WHEN ? != '' THEN ? ELSE phone END, updated_at = ? 
+                WHERE user_id = ? OR role = 'guide'
+            """, (name, phone, phone, now, user_id))
+
+            execute_write("""
+                INSERT INTO audit_events (audit_id, user_id, action, details, created_at)
+                VALUES (?, ?, 'PROFILE_UPDATED', ?, ?)
+            """, (f"aud-{uuid.uuid4().hex[:8]}", user_id, json.dumps({"name": name, "phone": phone}), now))
+
+            updated = query_one("SELECT user_id, name, email, role, phone, account_status, created_at, updated_at FROM users WHERE user_id = ? OR role = 'guide' LIMIT 1", (user_id,))
+            return self.send_json(200, {
+                "message": "Tour Guide profile updated successfully in database",
+                "user": updated
+            })
 
         # Resolve Alert
         m = re.match(r"^/api/alerts/([^/]+)/resolve$", path)

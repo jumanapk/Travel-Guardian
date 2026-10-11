@@ -42,29 +42,65 @@ MUNNAR_KNOWLEDGE_BASE = {
     )
 }
 
+def get_active_guide_info():
+    try:
+        import sys
+        import os
+        sys.path.append(os.path.join(os.path.dirname(__file__), "database"))
+        from db import query_one
+        guide = query_one("SELECT name, phone FROM users WHERE role = 'guide' LIMIT 1")
+        if guide:
+            return guide.get("name") or "Jumana", guide.get("phone") or "+91 98471 23456"
+    except Exception:
+        pass
+    return "Jumana", "+91 98471 23456"
+
 def generate_assistant_response(user_message: str) -> dict:
     msg = user_message.lower()
+    guide_name, guide_phone = get_active_guide_info()
     
     if any(k in msg for k in ["sos", "emergency", "danger", "help me", "hurt", "bleeding"]):
-        reply = MUNNAR_KNOWLEDGE_BASE["sos"]
+        reply = (
+            f"🚨 **Emergency Action Plan**:\n"
+            f"1. **Stay Where You Are**: Avoid wandering deeper into tea plantations or unpaved forest trails.\n"
+            f"2. **Trigger In-App SOS**: Press the prominent red 'Trigger SOS' button so Tour Guide {guide_name} receives your coordinates immediately.\n"
+            f"3. **Battery Conservation**: Turn off unnecessary background apps and screen brightness.\n"
+            f"4. **Local Assistance**: For acute life-threatening emergencies, Munnar Police Station is (+91 4865 230321) and Tata Tea General Hospital is (+91 4865 230491)."
+        )
     elif any(k in msg for k in ["lost", "separated", "alone", "can't find", "missed group", "where is"]):
-        reply = MUNNAR_KNOWLEDGE_BASE["separated"]
+        reply = (
+            f"📍 **Separated Tourist Protocol**:\n"
+            f"1. **Stop & Assess**: Remain in a visible, safe clearing near an identifiable landmark or road.\n"
+            f"2. **Open Reunion Mode**: Check the Travel Guard Reunion screen for the active meeting point (Mattupetty Dam Pavilion).\n"
+            f"3. **Broadcast Location**: Ensure location sharing is active so Guide {guide_name} can view your live pinpoint on the map.\n"
+            f"4. **Direct Contact**: Call your guide {guide_name} directly through the Group Members directory ({guide_phone})."
+        )
     elif any(k in msg for k in ["weather", "rain", "mist", "cold", "fog", "forecast"]):
         reply = MUNNAR_KNOWLEDGE_BASE["weather"]
     elif any(k in msg for k in ["elephant", "animal", "wildlife", "snake", "danger", "forest"]):
-        reply = MUNNAR_KNOWLEDGE_BASE["wildlife"]
+        reply = (
+            f"🐘 **Wildlife & Forest Caution**:\n"
+            f"The hills bordering Eravikulam and Lockhart Gap frequently experience wild elephant movement:\n"
+            f"• Never use flash photography or make loud honking noises.\n"
+            f"• Maintain a distance of at least 50 meters from wild animals.\n"
+            f"• Stay strictly on designated tourist paths with Guide {guide_name}."
+        )
     elif any(k in msg for k in ["leech", "medic", "hospital", "doctor", "headache", "first aid", "sick"]):
         reply = MUNNAR_KNOWLEDGE_BASE["first_aid"]
     elif any(k in msg for k in ["meeting point", "where to meet", "rendezvous", "pavilion", "reunion"]):
-        reply = MUNNAR_KNOWLEDGE_BASE["meeting_point"]
-    elif any(k in msg for k in ["jumana", "guide", "contact"]):
-        reply = "Tour Guide Jumana is leading the Munnar Tea Hills Expedition. You can contact her directly via the Group Members screen (+91 98471 23456)."
+        reply = (
+            f"🚩 **Meeting Point Information**:\n"
+            f"The current designated group reunion point is **Mattupetty Dam Pavilion** (Coordinates: 10.1082° N, 77.1245° E). "
+            f"Guide {guide_name} has set this as the primary safe zone."
+        )
+    elif any(k in msg for k in [guide_name.lower(), "jumana", "guide", "contact"]):
+        reply = f"Tour Guide {guide_name} is leading the Munnar Tea Hills Expedition. You can contact her directly via the Group Members screen ({guide_phone})."
     elif any(k in msg for k in ["hello", "hi", "hey"]):
-        reply = "Hello! I am your Travel Guard AI Safety Assistant. How can I assist you with trail safety, reunion points, or emergency procedures in Munnar today?"
+        reply = f"Hello! I am your Travel Guard AI Safety Assistant. How can I assist you with trail safety, reunion points, or emergency procedures with Guide {guide_name} today?"
     else:
         reply = (
             f"Here is safety guidance for your query: Stay in designated areas, keep your Travel Guard location active, "
-            f"and coordinate with Guide Jumana. If you are experiencing an urgent emergency, use the SOS button or contact the guide immediately."
+            f"and coordinate with Guide {guide_name}. If you are experiencing an urgent emergency, use the SOS button or contact the guide immediately ({guide_phone})."
         )
         
     return {

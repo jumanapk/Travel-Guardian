@@ -239,5 +239,39 @@ class TravelGuardBackendTestSuite(unittest.TestCase):
         self.assertEqual(status, 404)
         self.assertIn("error", data)
 
+    def test_14_profile_retrieval_and_update(self):
+        """Tests retrieving and updating tour guide profile with validation and database persistence."""
+        # 1. Retrieve current guide profile
+        status, data = api_request("/profile")
+        self.assertEqual(status, 200)
+        self.assertIn("user", data)
+        self.assertEqual(data["user"]["role"], "guide")
+
+        # 2. Update guide name to 'Amina'
+        status, update_data = api_request("/profile", method="PATCH", data={
+            "name": "Amina",
+            "phone": "+91 98471 99999"
+        })
+        self.assertEqual(status, 200)
+        self.assertEqual(update_data["user"]["name"], "Amina")
+        self.assertEqual(update_data["user"]["phone"], "+91 98471 99999")
+
+        # 3. Direct database verification
+        guide_in_db = query_one("SELECT name, phone FROM users WHERE role = 'guide'")
+        self.assertEqual(guide_in_db["name"], "Amina")
+        self.assertEqual(guide_in_db["phone"], "+91 98471 99999")
+
+        # 4. Verify subsequent GET returns 'Amina'
+        status_after, data_after = api_request("/profile")
+        self.assertEqual(status_after, 200)
+        self.assertEqual(data_after["user"]["name"], "Amina")
+
+        # 5. Validation rejection on blank name
+        err_status, err_data = api_request("/profile", method="PATCH", data={
+            "name": "   "
+        })
+        self.assertEqual(err_status, 400)
+        self.assertIn("error", err_data)
+
 if __name__ == "__main__":
     unittest.main()

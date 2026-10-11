@@ -483,12 +483,147 @@ const apiService = {
     });
     if (!res.ok) throw new Error("Failed to query AI assistant backend");
     return res.json();
+  },
+  async getProfile() {
+    const res = await fetch(`${API_BASE}/profile`);
+    if (!res.ok) throw new Error("Failed to fetch tour guide profile");
+    return res.json();
+  },
+  async updateProfile({ name, phone }) {
+    const res = await fetch(`${API_BASE}/profile`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, phone })
+    });
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      throw new Error(errData.error || "Failed to update profile in database");
+    }
+    return res.json();
   }
 };
 
 // ============================================================================
 // 3. REUSABLE SHARED NAVIGATION & DIALOG COMPONENTS
 // ============================================================================
+
+// --- Tour Guide Profile Modal ---
+function EditProfileModal({ isOpen, onClose, tourGuide, onSaveProfile }) {
+  if (!isOpen) return null;
+  const [name, setName] = useState(tourGuide?.name || "");
+  const [phone, setPhone] = useState(tourGuide?.phone || "");
+  const [isSaving, setIsSaving] = useState(false);
+  const [errorMsg, setErrorMsg] = useState("");
+  const [successMsg, setSuccessMsg] = useState("");
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!name.trim()) {
+      setErrorMsg("Please enter a valid tour guide name.");
+      return;
+    }
+    setErrorMsg("");
+    setIsSaving(true);
+    try {
+      await onSaveProfile({ name: name.trim(), phone: phone.trim() });
+      setSuccessMsg("Tour Guide profile updated and saved to database!");
+      setTimeout(() => {
+        setSuccessMsg("");
+        onClose();
+      }, 1000);
+    } catch (err) {
+      setErrorMsg(err.message || "Failed to save profile to database.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm modal-enter">
+      <div className="w-full max-w-md bg-white rounded-3xl p-6 sm:p-7 shadow-2xl border border-[#075B50]/15 relative">
+        <button 
+          onClick={onClose} 
+          className="absolute top-4 right-4 p-2 rounded-full hover:bg-slate-100 text-[#075B50] transition-colors"
+        >
+          <X className="w-5 h-5" />
+        </button>
+
+        <div className="flex items-center gap-3 mb-5">
+          <div className="w-12 h-12 rounded-2xl bg-[#EAF7F0] flex items-center justify-center text-[#075B50]">
+            <Users className="w-6 h-6" />
+          </div>
+          <div>
+            <h3 className="text-lg font-bold text-[#075B50]">Edit Tour Guide Profile</h3>
+            <p className="text-xs text-[#507A70]">Updates guide name across all 9 screens & database</p>
+          </div>
+        </div>
+
+        {errorMsg && (
+          <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 text-xs rounded-xl flex items-center gap-2">
+            <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+            <span>{errorMsg}</span>
+          </div>
+        )}
+
+        {successMsg && (
+          <div className="mb-4 p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs rounded-xl flex items-center gap-2">
+            <Check className="w-4 h-4 flex-shrink-0 text-emerald-600" />
+            <span>{successMsg}</span>
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} className="space-y-4 text-xs">
+          <div>
+            <label className="block font-bold text-[#075B50] mb-1">Tour Guide Full Name *</label>
+            <input 
+              type="text" 
+              required
+              value={name} 
+              onChange={(e) => setName(e.target.value)}
+              placeholder="e.g. Amina or Jumana"
+              disabled={isSaving}
+              className="w-full px-3.5 py-2.5 rounded-xl border border-[#075B50]/20 focus:outline-none focus:ring-2 focus:ring-[#075B50]/30 text-xs text-[#1A332D]"
+            />
+          </div>
+
+          <div>
+            <label className="block font-bold text-[#075B50] mb-1">Contact Phone Number</label>
+            <input 
+              type="tel" 
+              value={phone} 
+              onChange={(e) => setPhone(e.target.value)}
+              placeholder="+91 98471 23456"
+              disabled={isSaving}
+              className="w-full px-3.5 py-2.5 rounded-xl border border-[#075B50]/20 focus:outline-none focus:ring-2 focus:ring-[#075B50]/30 text-xs text-[#1A332D]"
+            />
+          </div>
+
+          <div className="p-3 bg-[#EAF7F0]/60 rounded-xl border border-[#075B50]/10 text-[11px] text-[#176B57]">
+            Badge ID: <strong>{tourGuide?.passId || "#TG-GUIDE-MUNNAR-01"}</strong> • Sector: <strong>{tourGuide?.assignedGroup || "Munnar Highlands Expedition"}</strong>
+          </div>
+
+          <div className="flex items-center justify-end gap-2 pt-2">
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={isSaving}
+              className="px-4 py-2 rounded-full text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-[#1A332D] transition-colors cursor-pointer"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={isSaving}
+              className="px-5 py-2 rounded-full text-xs font-bold bg-[#075B50] hover:bg-[#176B57] text-white shadow-md transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+            >
+              {isSaving ? "Saving to Database..." : "Save Profile"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
 
 // --- Shared Confirmation Modal ---
 function ConfirmationModal({ isOpen, title, message, confirmText, confirmColor = "bg-[#075B50]", onConfirm, onCancel }) {
@@ -518,7 +653,7 @@ function ConfirmationModal({ isOpen, title, message, confirmText, confirmColor =
 }
 
 // --- Member Detail Modal ---
-function MemberDetailModal({ tourist, isOpen, onClose, onLocate, onStartReunion, onTriggerSos, hasActiveSos, alertRecord, onViewAlert }) {
+function MemberDetailModal({ tourist, isOpen, onClose, onLocate, onStartReunion, onTriggerSos, hasActiveSos, alertRecord, onViewAlert, tourGuide }) {
   if (!isOpen || !tourist) return null;
 
   return (
@@ -558,7 +693,7 @@ function MemberDetailModal({ tourist, isOpen, onClose, onLocate, onStartReunion,
               <ShieldAlert className="w-5 h-5 text-red-600 animate-bounce" />
               <div>
                 <p className="text-xs font-bold text-red-700">Active SOS Emergency Alert</p>
-                <p className="text-[11px] text-red-600">Urgent support recorded by tour guide Jumana.</p>
+                <p className="text-[11px] text-red-600">Urgent support recorded by tour guide {tourGuide?.name || "Tour Guide"}.</p>
               </div>
             </div>
             <button
@@ -634,7 +769,7 @@ function MemberDetailModal({ tourist, isOpen, onClose, onLocate, onStartReunion,
 }
 
 // --- Shared App Header (Screens 2 through 9) ---
-function SharedAppHeader({ currentScreen, onNavigate, unreadAlertsCount, onOpenMobileNav, backendStatus }) {
+function SharedAppHeader({ currentScreen, onNavigate, unreadAlertsCount, onOpenMobileNav, backendStatus, tourGuide, onEditProfile }) {
   const screenTitles = {
     'dashboard': 'Tour Guide Dashboard (Screen 2)',
     'sos': 'SOS Emergency Support (Screen 3)',
@@ -716,16 +851,23 @@ function SharedAppHeader({ currentScreen, onNavigate, unreadAlertsCount, onOpenM
             )}
           </button>
 
-          {/* Guide Jumana badge */}
-          <div className="flex items-center gap-2 pl-2 border-l border-[#075B50]/15">
+          {/* Guide dynamic badge (Click to Edit Profile) */}
+          <div 
+            onClick={onEditProfile}
+            className="flex items-center gap-2 pl-2 border-l border-[#075B50]/15 cursor-pointer hover:opacity-85 transition-opacity"
+            title="Click to view and edit Tour Guide profile"
+          >
             <img 
-              src={TOUR_GUIDE.avatar} 
-              alt="Jumana" 
+              src={tourGuide?.avatar || TOUR_GUIDE.avatar} 
+              alt={tourGuide?.name || "Tour Guide"} 
               className="w-8 h-8 rounded-full object-cover border border-[#075B50]/30 shadow-sm"
             />
             <div className="hidden xl:flex flex-col text-left">
-              <span className="text-xs font-bold text-[#075B50] leading-none">Jumana</span>
-              <span className="text-[10px] text-[#176B57] font-medium">Tour Guide</span>
+              <span className="text-xs font-bold text-[#075B50] leading-none">{tourGuide?.name || "Tour Guide"}</span>
+              <span className="text-[10px] text-[#176B57] font-medium flex items-center gap-1">
+                <span>Guide</span>
+                <span className="text-[9px] text-[#075B50] font-bold underline">(Edit)</span>
+              </span>
             </div>
           </div>
         </div>
@@ -736,7 +878,7 @@ function SharedAppHeader({ currentScreen, onNavigate, unreadAlertsCount, onOpenM
 }
 
 // --- Shared Sidebar Navigation (Screens 2 through 9) ---
-function SharedSidebar({ currentScreen, onNavigate, unreadAlertsCount, isOpenOnMobile, onCloseMobile }) {
+function SharedSidebar({ currentScreen, onNavigate, unreadAlertsCount, isOpenOnMobile, onCloseMobile, tourGuide, onEditProfile }) {
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: Home, badge: null },
     { id: 'members', label: 'Group Members', icon: Users, badge: '4' },
@@ -808,8 +950,18 @@ function SharedSidebar({ currentScreen, onNavigate, unreadAlertsCount, isOpenOnM
         </button>
 
         <div className="p-3 bg-[#EAF7F0]/60 rounded-xl border border-[#075B50]/10 text-[10px] text-[#507A70] leading-snug">
-          <strong>Jumana (Tour Guide)</strong>
-          <p className="mt-0.5">Munnar Highlands Grid #TG-GUIDE-01</p>
+          <div className="flex items-center justify-between">
+            <strong className="text-[#075B50] font-bold text-xs">{tourGuide?.name || "Tour Guide"}</strong>
+            {onEditProfile && (
+              <button 
+                onClick={onEditProfile} 
+                className="text-[10px] text-[#075B50] font-bold underline hover:text-[#176B57] cursor-pointer"
+              >
+                Edit
+              </button>
+            )}
+          </div>
+          <p className="mt-0.5">{tourGuide?.role || "Tour Guide"} • {tourGuide?.passId || "#TG-GUIDE-01"}</p>
         </div>
       </div>
     </div>
@@ -882,20 +1034,37 @@ function WelcomeFeatureModal({ feature, onClose }) {
   );
 }
 
-function WelcomeRegistrationModal({ isOpen, onClose, onGoToDashboard }) {
+function WelcomeRegistrationModal({ isOpen, onClose, onGoToDashboard, onUpdateGuideProfile, tourGuide }) {
   if (!isOpen) return null;
-  const [formData, setFormData] = useState({ fullName: '', phone: '' });
+  const [formData, setFormData] = useState({ fullName: tourGuide?.name || '', phone: tourGuide?.phone || '' });
   const [isSuccess, setIsSuccess] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (formData.fullName.trim() && formData.phone.trim()) {
+    const cleanName = formData.fullName.trim();
+    if (!cleanName) {
+      setErrorMsg("Please enter a valid full name.");
+      return;
+    }
+    setErrorMsg('');
+    setIsSubmitting(true);
+    try {
+      if (onUpdateGuideProfile) {
+        await onUpdateGuideProfile({ name: cleanName, phone: formData.phone.trim() });
+      }
       setIsSuccess(true);
+    } catch (err) {
+      setErrorMsg(err.message || "Failed to save profile to database. Please check your connection.");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   const handleReset = () => {
     setIsSuccess(false);
+    setErrorMsg('');
     setFormData({ fullName: '', phone: '' });
     onClose();
   };
@@ -918,13 +1087,20 @@ function WelcomeRegistrationModal({ isOpen, onClose, onGoToDashboard }) {
           <p className="text-xs text-[#176B57] mt-1">Start your guided exploration with instant safety telemetry.</p>
         </div>
 
+        {errorMsg && (
+          <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 text-xs rounded-xl flex items-center gap-2">
+            <ShieldAlert className="w-4 h-4 flex-shrink-0" />
+            <span>{errorMsg}</span>
+          </div>
+        )}
+
         {isSuccess ? (
           <div className="space-y-4">
             <div className="p-4 bg-[#EAF7F0] rounded-2xl border border-[#075B50]/20 text-center">
               <CheckCircle2 className="w-10 h-10 text-[#075B50] mx-auto mb-2" />
-              <h4 className="font-bold text-[#075B50] text-sm">Safety Pass Activated!</h4>
+              <h4 className="font-bold text-[#075B50] text-sm">Safety Pass Activated & Saved in Database!</h4>
               <p className="text-xs text-[#176B57] mt-1">
-                Welcome, <strong>{formData.fullName}</strong>. Telemetry network connected.
+                Welcome, <strong>{formData.fullName}</strong>. Telemetry network and guide profile synchronized.
               </p>
             </div>
 
@@ -948,7 +1124,8 @@ function WelcomeRegistrationModal({ isOpen, onClose, onGoToDashboard }) {
               <input
                 type="text"
                 required
-                placeholder="e.g. Jumana"
+                disabled={isSubmitting}
+                placeholder="e.g. Amina or Jumana"
                 value={formData.fullName}
                 onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
                 className="w-full px-3.5 py-2.5 rounded-xl border border-[#075B50]/20 focus:outline-none focus:ring-2 focus:ring-[#075B50]/30 text-xs"
@@ -962,6 +1139,7 @@ function WelcomeRegistrationModal({ isOpen, onClose, onGoToDashboard }) {
               <input
                 type="tel"
                 required
+                disabled={isSubmitting}
                 placeholder="+91 98471 00000"
                 value={formData.phone}
                 onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
@@ -971,10 +1149,20 @@ function WelcomeRegistrationModal({ isOpen, onClose, onGoToDashboard }) {
 
             <button
               type="submit"
-              className="w-full bg-[#075B50] hover:bg-[#176B57] text-white font-semibold py-3 px-4 rounded-xl text-xs transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer"
+              disabled={isSubmitting}
+              className="w-full bg-[#075B50] hover:bg-[#176B57] text-white font-semibold py-3 px-4 rounded-xl text-xs transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
             >
-              <span>Activate Safety Pass</span>
-              <ArrowRight className="w-4 h-4" />
+              {isSubmitting ? (
+                <>
+                  <RefreshCw className="w-4 h-4 animate-spin" />
+                  <span>Saving to Database...</span>
+                </>
+              ) : (
+                <>
+                  <span>Activate Safety Pass</span>
+                  <ArrowRight className="w-4 h-4" />
+                </>
+              )}
             </button>
           </form>
         )}
@@ -983,7 +1171,7 @@ function WelcomeRegistrationModal({ isOpen, onClose, onGoToDashboard }) {
   );
 }
 
-function WelcomeScreen({ onGoToDashboard }) {
+function WelcomeScreen({ onGoToDashboard, onUpdateGuideProfile, tourGuide }) {
   const [isRegisterOpen, setIsRegisterOpen] = useState(false);
   const [selectedFeature, setSelectedFeature] = useState(null);
 
@@ -1255,6 +1443,8 @@ function WelcomeScreen({ onGoToDashboard }) {
         isOpen={isRegisterOpen} 
         onClose={() => setIsRegisterOpen(false)} 
         onGoToDashboard={onGoToDashboard} 
+        onUpdateGuideProfile={onUpdateGuideProfile}
+        tourGuide={tourGuide}
       />
 
       <WelcomeFeatureModal 
@@ -1270,7 +1460,7 @@ function WelcomeScreen({ onGoToDashboard }) {
 // 5. SCREEN 2: TOUR GUIDE DASHBOARD (MAIN OVERVIEW)
 // ============================================================================
 
-function DashboardScreen({ tourists, alerts, onNavigate, onSelectTourist, onSimulateAlert }) {
+function DashboardScreen({ tourists, alerts, onNavigate, onSelectTourist, onSimulateAlert, tourGuide, onEditProfile }) {
   const mapRef = useRef(null);
   const leafletMapInstance = useRef(null);
 
@@ -1364,15 +1554,27 @@ function DashboardScreen({ tourists, alerts, onNavigate, onSelectTourist, onSimu
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
             <span>Munnar, Kerala • Active Group Trip</span>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-[#075B50] tracking-tight">
-            Good morning, Jumana!
-          </h1>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-[#075B50] tracking-tight">
+              Good morning, {tourGuide?.name || "Tour Guide"}!
+            </h1>
+            {onEditProfile && (
+              <button
+                onClick={onEditProfile}
+                className="px-3.5 py-1.5 rounded-full text-xs font-bold bg-[#075B50] hover:bg-[#176B57] text-white shadow-sm flex items-center gap-1.5 transition-all cursor-pointer"
+                title="Edit tour guide profile name and phone"
+              >
+                <Users className="w-3.5 h-3.5" />
+                <span>Edit Profile</span>
+              </button>
+            )}
+          </div>
           <p className="text-sm sm:text-base text-[#176B57] mt-1.5 font-normal leading-relaxed">
             “Here's your group status and live location.” All 4 registered tourists are connected to your safety beacon network.
           </p>
           <div className="mt-4 flex flex-wrap items-center gap-2 text-xs font-semibold text-[#075B50]">
             <span className="px-2.5 py-1 rounded-lg bg-white/80 border border-[#075B50]/15">
-              Verified Guide #TG-GUIDE-MUNNAR-01
+              Verified Guide {tourGuide?.passId || "#TG-GUIDE-MUNNAR-01"}
             </span>
             <span className="px-2.5 py-1 rounded-lg bg-white/80 border border-[#075B50]/15">
               Simulated Telemetry Grid (Demo Environment)
@@ -1606,7 +1808,7 @@ function DashboardScreen({ tourists, alerts, onNavigate, onSelectTourist, onSimu
 // 6. SCREEN 3: SOS EMERGENCY SUPPORT (DEDICATED SCREEN)
 // ============================================================================
 
-function SOSEmergencyScreen({ tourists, alerts, onTriggerSosConfirm, onNavigate }) {
+function SOSEmergencyScreen({ tourists, alerts, onTriggerSosConfirm, onNavigate, tourGuide }) {
   const [selectedTouristId, setSelectedTouristId] = useState(tourists[0]?.id || "hisha");
   const [category, setCategory] = useState("Medical");
   const [priority, setPriority] = useState("Emergency");
@@ -1650,7 +1852,7 @@ function SOSEmergencyScreen({ tourists, alerts, onTriggerSosConfirm, onNavigate 
             “Respond quickly when a tourist needs urgent assistance.”
           </p>
           <p className="text-xs text-[#507A70] mt-1">
-            Logged In Tour Guide: <strong>Jumana</strong> (#TG-GUIDE-MUNNAR-01)
+            Logged In Tour Guide: <strong>{tourGuide?.name || "Tour Guide"}</strong> ({tourGuide?.passId || "#TG-GUIDE-MUNNAR-01"})
           </p>
         </div>
 
@@ -1858,7 +2060,7 @@ function SOSEmergencyScreen({ tourists, alerts, onTriggerSosConfirm, onNavigate 
 // 7. SCREEN 4: ALERT DETAILS (DEDICATED SCREEN)
 // ============================================================================
 
-function AlertDetailsScreen({ alertId, alerts, tourists, onResolveAlert, onReopenAlert, onNavigate }) {
+function AlertDetailsScreen({ alertId, alerts, tourists, onResolveAlert, onReopenAlert, onNavigate, tourGuide }) {
   const [isResolveConfirmOpen, setIsResolveConfirmOpen] = useState(false);
   const [isReopenConfirmOpen, setIsReopenConfirmOpen] = useState(false);
 
@@ -1939,7 +2141,7 @@ function AlertDetailsScreen({ alertId, alerts, tourists, onResolveAlert, onReope
                 High Priority Emergency SOS
               </h3>
               <p className="text-xs text-red-600">
-                Action required by tour guide Jumana. Guide tourist to meeting point or confirm safety.
+                Action required by tour guide {tourGuide?.name || "Tour Guide"}. Guide tourist to meeting point or confirm safety.
               </p>
             </div>
           </div>
@@ -2029,7 +2231,7 @@ function AlertDetailsScreen({ alertId, alerts, tourists, onResolveAlert, onReope
             
             <div className="space-y-3">
               {(alert.timeline || [
-                { event: "Alert created", timestamp: alert.timestamp, note: "Logged by Tour Guide Jumana" }
+                { event: "Alert created", timestamp: alert.timestamp, note: `Logged by Tour Guide ${tourGuide?.name || "Tour Guide"}` }
               ]).map((event, idx) => (
                 <div key={idx} className="flex items-start gap-3 text-xs">
                   <div className="w-2.5 h-2.5 rounded-full bg-[#075B50] mt-1.5 flex-shrink-0" />
@@ -2154,7 +2356,8 @@ function ReunionModeScreen({
   preselectedTouristId, 
   onUpdateMeetingPoint, 
   onMarkTouristReunited, 
-  onNavigate 
+  onNavigate,
+  tourGuide
 }) {
   const [selectedId, setSelectedId] = useState(preselectedTouristId || tourists[0]?.id || "hisha");
   const [activeTab, setActiveTab] = useState("map");
@@ -2266,10 +2469,10 @@ function ReunionModeScreen({
         (pos) => {
           const lat = pos.coords.latitude;
           const lng = pos.coords.longitude;
-          setLocationNotice(`Guide device coordinates obtained: ${lat.toFixed(4)}° N, ${lng.toFixed(4)}° E. Note: This identifies Jumana's mobile device, not tourist hardware.`);
+          setLocationNotice(`Guide device coordinates obtained: ${lat.toFixed(4)}° N, ${lng.toFixed(4)}° E. Note: This identifies ${tourGuide?.name || "the guide"}'s mobile device, not tourist hardware.`);
           onUpdateMeetingPoint({
             id: `mp-guide-${Date.now()}`,
-            name: "Guide Jumana's Current Location Checkpoint",
+            name: `Guide ${tourGuide?.name || "Guide"}'s Current Location Checkpoint`,
             lat,
             lng,
             description: "Updated to guide's live device location via browser GPS."
@@ -2309,7 +2512,7 @@ function ReunionModeScreen({
             “Helping everyone find their way back together.”
           </p>
           <p className="text-xs text-[#507A70] mt-1">
-            Tour Guide in Charge: <strong>Jumana</strong> (#TG-GUIDE-MUNNAR-01)
+            Tour Guide in Charge: <strong>{tourGuide?.name || "Tour Guide"}</strong> ({tourGuide?.passId || "#TG-GUIDE-MUNNAR-01"})
           </p>
         </div>
 
@@ -2534,7 +2737,8 @@ function GroupMembersScreen({
   tourists, 
   alerts, 
   onSelectTouristForModal, 
-  onNavigate 
+  onNavigate,
+  tourGuide
 }) {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedFilter, setSelectedFilter] = useState("all");
@@ -2585,7 +2789,7 @@ function GroupMembersScreen({
             “Manage your group and keep every traveller connected.”
           </p>
           <p className="text-xs text-[#507A70] mt-1">
-            Tour Guide: <strong>Jumana</strong> • Group: Munnar Highlands Expedition
+            Tour Guide: <strong>{tourGuide?.name || "Tour Guide"}</strong> • Group: {tourGuide?.assignedGroup || "Munnar Highlands Expedition"}
           </p>
         </div>
 
@@ -2771,7 +2975,8 @@ function LiveLocationScreen({
   alerts, 
   highlightTouristId, 
   onSelectTouristForModal, 
-  onNavigate 
+  onNavigate,
+  tourGuide
 }) {
   const [selectedFilter, setSelectedFilter] = useState("all");
   const [activeLocateId, setActiveLocateId] = useState(highlightTouristId || null);
@@ -2966,7 +3171,7 @@ function LiveLocationScreen({
             “Know where your group is and help everyone travel safely.”
           </p>
           <p className="text-xs text-[#507A70] mt-1">
-            Tour Guide: <strong>Jumana</strong> • Sector: Munnar, Kerala, India
+            Tour Guide: <strong>{tourGuide?.name || "Tour Guide"}</strong> • Sector: Munnar, Kerala, India
           </p>
         </div>
 
@@ -3184,7 +3389,8 @@ function AlertsNotificationsScreen({
   onResolveAlert, 
   onReopenAlert, 
   onMarkAllAsRead, 
-  onNavigate 
+  onNavigate,
+  tourGuide
 }) {
   const [searchTerm, setSearchTerm] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
@@ -3263,7 +3469,7 @@ function AlertsNotificationsScreen({
             “Stay informed about your group's safety.”
           </p>
           <p className="text-xs text-[#507A70] mt-1">
-            Tour Guide: <strong>Jumana</strong> • Unresolved Alerts: <strong>{unresolvedCount}</strong>
+            Tour Guide: <strong>{tourGuide?.name || "Tour Guide"}</strong> • Unresolved Alerts: <strong>{unresolvedCount}</strong>
           </p>
         </div>
 
@@ -3490,12 +3696,12 @@ function AlertsNotificationsScreen({
 // 12. SCREEN 9: AI TRAVEL ASSISTANT (DEDICATED SCREEN)
 // ============================================================================
 
-function AIAssistantScreen({ tourists, alerts, onNavigate }) {
+function AIAssistantScreen({ tourists, alerts, onNavigate, tourGuide }) {
   const [messages, setMessages] = useState([
     {
       id: "msg-1",
       sender: "assistant",
-      text: "Hello Jumana! I am your Travel Guard Safety Assistant for the Munnar Highlands Expedition. I have real-time visibility into your 4 group members (Hisha, Rinsha, Sana, and Dilrooba). How can I assist you with trail safety, emergency protocol, or weather guidance today?",
+      text: `Hello ${tourGuide?.name || "Tour Guide"}! I am your Travel Guard Safety Assistant for the Munnar Highlands Expedition. I have real-time visibility into your 4 group members (Hisha, Rinsha, Sana, and Dilrooba). How can I assist you with trail safety, emergency protocol, or weather guidance today?`,
       timestamp: "Just now"
     }
   ]);
@@ -3526,9 +3732,10 @@ function AIAssistantScreen({ tourists, alerts, onNavigate }) {
   // Local Knowledge Base for Munnar & Travel Safety
   const generateResponse = (prompt) => {
     const q = prompt.toLowerCase();
+    const guideDisplayName = tourGuide?.name || "Tour Guide";
 
     if (q.includes("emergency") || q.includes("sos") || q.includes("danger")) {
-      return `🚨 EMERGENCY PROTOCOL FOR TOUR GUIDE JUMANA:
+      return `🚨 EMERGENCY PROTOCOL FOR TOUR GUIDE ${guideDisplayName.toUpperCase()}:
 
 1. Stop the group and gather members in a safe, visible assembly point.
 2. Open 'Screen 3: SOS Emergency Support' to record telemetry and incident priority.
@@ -3554,7 +3761,7 @@ function AIAssistantScreen({ tourists, alerts, onNavigate }) {
 • Weather Advisory: Keep raingear ready for afternoon mist.
 • Geofence Boundaries: Maintain members within the 2km perimeter.
 • Clean Water Points: Verified hydration posts at Blossom Hydel & Tea Museum.
-• Ranger Beacon: Active check-in every 30 minutes with guide Jumana.`;
+• Ranger Beacon: Active check-in every 30 minutes with guide ${guideDisplayName}.`;
     }
 
     if (q.includes("unavailable") || q.includes("offline") || q.includes("signal")) {
@@ -3575,7 +3782,7 @@ function AIAssistantScreen({ tourists, alerts, onNavigate }) {
 • Assembly Hub: Always regroup at Munnar Tea Museum before dusk.`;
     }
 
-    return `Thank you, Jumana. Regarding "${prompt}": All 4 members (Hisha, Rinsha, Sana, Dilrooba) are connected to your Munnar mesh network. For safety coordination, ensure you maintain direct beacon contact and utilize Reunion Mode if trail spacing widens. Let me know if you need specific emergency checklists or checkpoint guidance!`;
+    return `Thank you, ${guideDisplayName}. Regarding "${prompt}": All 4 members (Hisha, Rinsha, Sana, Dilrooba) are connected to your Munnar mesh network. For safety coordination, ensure you maintain direct beacon contact and utilize Reunion Mode if trail spacing widens. Let me know if you need specific emergency checklists or checkpoint guidance!`;
   };
 
   const handleSendMessage = async (textToSend) => {
@@ -3641,7 +3848,7 @@ function AIAssistantScreen({ tourists, alerts, onNavigate }) {
             “Your smart companion for safer journeys.”
           </p>
           <p className="text-xs text-[#507A70] mt-1">
-            Tour Guide: <strong>Jumana</strong> • Context: Munnar Highlands Expedition
+            Tour Guide: <strong>{tourGuide?.name || "Tour Guide"}</strong> • Context: {tourGuide?.assignedGroup || "Munnar Highlands Expedition"}
           </p>
         </div>
 
@@ -3852,6 +4059,8 @@ function App() {
   const [currentScreen, setCurrentScreen] = useState('welcome');
 
   // Shared Data States
+  const [tourGuide, setTourGuide] = useState(TOUR_GUIDE);
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [tourists, setTourists] = useState(INITIAL_TOURISTS);
   const [alerts, setAlerts] = useState([]); // Empty initial state per Requirement 6
   const [meetingPoint, setMeetingPoint] = useState(DEFAULT_MEETING_POINT);
@@ -3878,6 +4087,23 @@ function App() {
 
     async function syncBackendData() {
       try {
+        // 0. Live Tour Guide Profile from database
+        try {
+          const profileRes = await apiService.getProfile();
+          if (profileRes && profileRes.user && isMounted) {
+            setTourGuide(prev => ({
+              ...prev,
+              id: profileRes.user.user_id || prev.id,
+              name: profileRes.user.name || prev.name,
+              phone: profileRes.user.phone || prev.phone,
+              email: profileRes.user.email || prev.email,
+              role: profileRes.user.role === 'guide' ? "Lead Mountain Safety Guide" : (profileRes.user.role || prev.role)
+            }));
+          }
+        } catch (profileErr) {
+          console.warn("[Travel Guard Profile Sync]:", profileErr.message);
+        }
+
         // 1. Live Alerts from SQLite / Express backend
         const alertsRes = await apiService.getAlerts();
         if (alertsRes && Array.isArray(alertsRes.alerts)) {
@@ -3899,7 +4125,7 @@ function App() {
                 {
                   event: `Alert ${a.status}`,
                   timestamp: timeStr,
-                  note: `Recorded in backend database by ${a.creator_name || 'Jumana'}.`
+                  note: `Recorded in backend database by ${a.creator_name || tourGuide?.name || 'Tour Guide'}.`
                 }
               ]
             };
@@ -3968,6 +4194,20 @@ function App() {
     if (params.highlightTouristId !== undefined) setHighlightTouristId(params.highlightTouristId);
   };
 
+  // Tour Guide Profile Update Handler (Connected to Backend Database API)
+  const handleUpdateGuideProfile = async ({ name, phone }) => {
+    const res = await apiService.updateProfile({ name, phone });
+    if (res && res.user) {
+      setTourGuide(prev => ({
+        ...prev,
+        name: res.user.name,
+        phone: res.user.phone || prev.phone,
+        email: res.user.email || prev.email
+      }));
+      return res.user;
+    }
+  };
+
   // SOS Creation Handler (From Screen 3 - Connected to Backend API)
   const handleTriggerSosConfirm = async ({ touristId, touristName, category, priority, description, location }) => {
     const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -4004,7 +4244,7 @@ function App() {
         {
           event: "Alert created",
           timestamp,
-          note: `Emergency SOS recorded in database by Tour Guide Jumana for ${touristName}.`
+          note: `Emergency SOS recorded in database by Tour Guide ${tourGuide?.name || "Tour Guide"} for ${touristName}.`
         }
       ]
     };
@@ -4079,7 +4319,7 @@ function App() {
           status: "Resolved",
           timeline: [
             ...(a.timeline || []),
-            { event: "Alert resolved", timestamp, note: "Marked resolved in database by Tour Guide Jumana." }
+            { event: "Alert resolved", timestamp, note: `Marked resolved in database by Tour Guide ${tourGuide?.name || "Tour Guide"}.` }
           ]
         };
       }
@@ -4115,7 +4355,7 @@ function App() {
           status: "Active",
           timeline: [
             ...(a.timeline || []),
-            { event: "Alert reopened", timestamp, note: "Reopened in database by Tour Guide Jumana." }
+            { event: "Alert reopened", timestamp, note: `Reopened in database by Tour Guide ${tourGuide?.name || "Tour Guide"}.` }
           ]
         };
       }
@@ -4191,6 +4431,8 @@ function App() {
     return (
       <WelcomeScreen 
         onGoToDashboard={() => navigateTo('dashboard')} 
+        onUpdateGuideProfile={handleUpdateGuideProfile}
+        tourGuide={tourGuide}
       />
     );
   }
@@ -4206,6 +4448,8 @@ function App() {
         unreadAlertsCount={unreadAlertsCount}
         onOpenMobileNav={() => setIsMobileNavOpen(true)}
         backendStatus={backendStatus}
+        tourGuide={tourGuide}
+        onEditProfile={() => setIsProfileModalOpen(true)}
       />
 
       <div className="flex-1 flex max-w-7xl w-full mx-auto">
@@ -4217,6 +4461,8 @@ function App() {
           unreadAlertsCount={unreadAlertsCount}
           isOpenOnMobile={isMobileNavOpen}
           onCloseMobile={() => setIsMobileNavOpen(false)}
+          tourGuide={tourGuide}
+          onEditProfile={() => setIsProfileModalOpen(true)}
         />
 
         {/* Main Content Body for Active Screen */}
@@ -4229,6 +4475,8 @@ function App() {
               onNavigate={navigateTo}
               onSelectTourist={(t) => setModalTourist(t)}
               onSimulateAlert={handleSimulateAlert}
+              tourGuide={tourGuide}
+              onEditProfile={() => setIsProfileModalOpen(true)}
             />
           )}
 
@@ -4238,6 +4486,7 @@ function App() {
               alerts={alerts}
               onTriggerSosConfirm={handleTriggerSosConfirm}
               onNavigate={navigateTo}
+              tourGuide={tourGuide}
             />
           )}
 
@@ -4249,6 +4498,7 @@ function App() {
               onResolveAlert={handleResolveAlert}
               onReopenAlert={handleReopenAlert}
               onNavigate={navigateTo}
+              tourGuide={tourGuide}
             />
           )}
 
@@ -4261,6 +4511,7 @@ function App() {
               onUpdateMeetingPoint={handleUpdateMeetingPoint}
               onMarkTouristReunited={handleMarkTouristReunited}
               onNavigate={navigateTo}
+              tourGuide={tourGuide}
             />
           )}
 
@@ -4270,6 +4521,7 @@ function App() {
               alerts={alerts}
               onSelectTouristForModal={(t) => setModalTourist(t)}
               onNavigate={navigateTo}
+              tourGuide={tourGuide}
             />
           )}
 
@@ -4281,6 +4533,7 @@ function App() {
               highlightTouristId={highlightTouristId}
               onSelectTouristForModal={(t) => setModalTourist(t)}
               onNavigate={navigateTo}
+              tourGuide={tourGuide}
             />
           )}
 
@@ -4291,6 +4544,7 @@ function App() {
               onReopenAlert={handleReopenAlert}
               onMarkAllAsRead={handleMarkAllAsRead}
               onNavigate={navigateTo}
+              tourGuide={tourGuide}
             />
           )}
 
@@ -4299,6 +4553,7 @@ function App() {
               tourists={tourists}
               alerts={alerts}
               onNavigate={navigateTo}
+              tourGuide={tourGuide}
             />
           )}
 
@@ -4317,8 +4572,17 @@ function App() {
           hasActiveSos={alerts.some(a => a.touristId === modalTourist.id && a.status === 'Active')}
           alertRecord={alerts.find(a => a.touristId === modalTourist.id && a.status === 'Active')}
           onViewAlert={(aId) => navigateTo('alert-details', { alertId: aId })}
+          tourGuide={tourGuide}
         />
       )}
+
+      {/* Tour Guide Profile Edit Modal */}
+      <EditProfileModal
+        isOpen={isProfileModalOpen}
+        onClose={() => setIsProfileModalOpen(false)}
+        tourGuide={tourGuide}
+        onSaveProfile={handleUpdateGuideProfile}
+      />
 
     </div>
   );

@@ -155,9 +155,25 @@ module.exports = async function handler(req, res) {
       });
     }
 
-    // 2. Auth
-    if (path === "/api/auth/me") {
-      return sendJson(res, 200, { user: users[0] });
+    // 2. Auth & Profile
+    if (path === "/api/auth/me" || (path === "/api/profile" && method === "GET")) {
+      const guide = users.find(u => u.role === "guide") || users[0];
+      return sendJson(res, 200, { user: guide });
+    }
+    if (path === "/api/profile" && method === "PATCH") {
+      const body = await parseBody(req);
+      const name = (body.name || body.fullName || "").trim();
+      if (!name) {
+        return sendJson(res, 400, { error: "Tour guide name cannot be empty" });
+      }
+      const guide = users.find(u => u.role === "guide") || users[0];
+      guide.name = name;
+      if (body.phone) guide.phone = body.phone;
+      group.guide_name = name;
+      return sendJson(res, 200, {
+        message: "Tour Guide profile updated successfully",
+        user: guide
+      });
     }
     if (path === "/api/auth/login" && method === "POST") {
       const body = await parseBody(req);
